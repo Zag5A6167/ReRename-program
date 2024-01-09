@@ -7,7 +7,9 @@ ReRename-program
 
 How to Use
  -Select your folder what you want to rename.
+ 
  -Click button rename then waiting for Succes. 
+ 
  -Finish see result.
 
 Example-----------------------------------------------------------------------------------------
