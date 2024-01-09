@@ -6,6 +6,7 @@ ReRename-program
 ![Capture](https://github.com/za12ew44zz/ReRename-program/assets/85066044/68804460-c2b6-49d7-8775-9d649017ab55)
 
 How to Use
+
  -Select your folder what you want to rename.
  
  -Click button rename then waiting for Succes. 
