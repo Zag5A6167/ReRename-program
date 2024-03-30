@@ -8,6 +8,7 @@ import ctypes
 win  = Tk()
 
 
+
 myappid = 'mycompany.myproduct.subproduct.version'
 ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
 
@@ -15,6 +16,22 @@ ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
 win.iconbitmap(default="R2N.ico")
 global file1
 file1 = None
+
+is_on = False  # Initial state (False for off)
+valBtnToggle = 3  # emoji , if 2 == sticker output file 
+def toggle_button():
+    global is_on  # Access the global variable
+    global valBtnToggle
+    is_on = not is_on  # Toggle the state
+    if is_on:
+        btnToggle.config(text="Sticker")  # Update button text based on state
+        valBtnToggle = 2
+    else:
+        btnToggle.config(text="Emoji")  # Update button text based on state
+        valBtnToggle = 3
+
+btnToggle = tk.Button(win, text="Emoji", command=toggle_button)  # Initial text "Off"
+btnToggle.pack()
 
 def fileOpen():
     
@@ -28,10 +45,12 @@ def fileOpen():
     
 def rename_file(file1):
         if messagebox.askyesno("Question","Are you sure?") == True:
-           
+
                 i = 1
                 for file in os.listdir(file1):
-                    new_file_name = "{0:03d}.png".format(i)
+                    new_file_name = str(i).zfill(valBtnToggle) + ".png".format(i)
+                    # new_file_name = "{0:03d}.png".format(i)
+
                     os.rename(file,new_file_name)
                     i = i + 1  
                     print(file)
@@ -58,7 +77,6 @@ x = (win.winfo_screenwidth()//2) - (width//2)
 y = (win.winfo_screenheight()//2) - (height//2)
 win.geometry('{}x{}+{}+{}' .format(width,height,x,y))
 win.title("ReReFilename")
-
 
 
 btnOpenFile = Button(text="Open Folder",width=20,pady=10,command=fileOpen).pack()
