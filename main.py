@@ -7,6 +7,7 @@ from PIL import Image
 import random
 import zipfile 
 
+# Set Application User Model ID for Windows (to fix icon/taskbar grouping)
 myappid = 'mycompany.myproduct.subproduct.version'
 ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
 
@@ -21,9 +22,10 @@ global sticker_size
 global emoji_size
 
 is_on = False
-valBtnToggle = 3
+valBtnToggle = 3 # 2 for Sticker mode (2-digit name), 3 for Emoji mode (3-digit name)
 current_folder_path = None
 
+# Target sizes for LINE Creators Market
 target_size_tab = (96, 74)
 main_size = (240, 240)
 sticker_size = (370, 320)
@@ -39,15 +41,18 @@ def toggle_button():
     folder_selected = current_folder_path is not None
 
     if is_on:
+        # Sticker Mode
         btnToggle.config(text=f"Sticker Mode (xx.png | {sticker_size[0]}x{sticker_size[1]}px)") 
         valBtnToggle = 2
         
         if folder_selected:
             btnMainImage.config(state=NORMAL, bg="#00CC99", fg="white")
     else:
+        # Emoji Mode
         btnToggle.config(text=f"Emoji Mode (xxx.png | {emoji_size[0]}x{emoji_size[1]}px)") 
         valBtnToggle = 3
         
+        # Main Image is usually not required for Emojis
         btnMainImage.config(state=DISABLED, bg="#00CC99", fg="white")
 
 def fileOpen():
@@ -59,10 +64,12 @@ def fileOpen():
     if selected_dir:
         current_folder_path = selected_dir
         
+        # Enable buttons after folder selection
         btnBulkProcess.config(state=NORMAL, bg="#FF4500", fg="white") 
         btnTabImage.config(state=NORMAL, bg="#00CC99", fg="white")
         btnZipArchive.config(state=NORMAL, bg="#3399FF", fg="white") 
         
+        # Check if Main Image button should be enabled based on mode
         if is_on:
              btnMainImage.config(state=NORMAL, bg="#00CC99", fg="white")
         else:
@@ -81,29 +88,30 @@ def process_bulk_resize_and_rename():
     global emoji_size
     
     if not current_folder_path or not os.path.isdir(current_folder_path):
-        messagebox.showerror("Error", "โปรดเลือกโฟลเดอร์ต้นทางก่อน")
+        messagebox.showerror("Error", "Please select a source folder first")
         return
 
+    # Filter and sort all PNG files
     all_png_files = sorted([
         f for f in os.listdir(current_folder_path) 
         if f.lower().endswith(".png") and os.path.isfile(os.path.join(current_folder_path, f))
     ])
     
     if not all_png_files:
-        messagebox.showerror("Error", "ไม่พบไฟล์ .png ในโฟลเดอร์ที่เลือก")
+        messagebox.showerror("Error", "No .png files found in the selected folder")
         return
 
     mode = "Emoji" if valBtnToggle == 3 else "Sticker"
     current_target_size = emoji_size if valBtnToggle == 3 else sticker_size
     
     warning_message = (
-        f"*** คำเตือน: ไฟล์ต้นฉบับจะถูกเขียนทับ ***\n\n"
-        f"โหมดปัจจุบัน: {mode}\n"
-        f"จำนวนไฟล์: {len(all_png_files)}\n"
-        f"ขนาดเป้าหมาย: {current_target_size[0]}x{current_target_size[1]}px\n\n"
-        f"ไฟล์ PNG ทั้งหมดในโฟลเดอร์นี้จะถูกลดขนาดและเปลี่ยนชื่อตามลำดับ "
-        f"และจะบันทึกทับไฟล์เดิมทันที! (พร้อมบีบอัดไฟล์)\n"
-        f"คุณได้สำรองไฟล์ต้นฉบับไว้แล้วใช่หรือไม่?"
+        f"*** WARNING: SOURCE FILES WILL BE OVERWRITTEN ***\n\n"
+        f"Current Mode: {mode}\n"
+        f"File Count: {len(all_png_files)}\n"
+        f"Target Size: {current_target_size[0]}x{current_target_size[1]}px\n\n"
+        f"All PNG files in this folder will be resized and renamed sequentially, "
+        f"and will be saved over the original files! (with compression)\n"
+        f"Have you backed up your source files?"
     )
     if messagebox.askyesno("CONFIRM: IN-PLACE OVERWRITE", warning_message, icon='warning') == False:
         return
@@ -113,12 +121,14 @@ def process_bulk_resize_and_rename():
     processed_images = [] 
 
     try:
+        # 1. Process images (Resize and queue for saving)
         for file_name in all_png_files:
             source_path = os.path.join(current_folder_path, file_name)
             
             with Image.open(source_path) as img:
                 resized_img = img.resize(current_target_size, Image.Resampling.LANCZOS)
                 
+                # Determine new file name (01.png or 001.png)
                 new_file_name = str(i).zfill(valBtnToggle) + ".png"
                 
                 processed_images.append((resized_img, new_file_name))
@@ -126,9 +136,11 @@ def process_bulk_resize_and_rename():
                 i += 1
                 processed_count += 1
         
+        # 2. Delete existing files (excluding reserved names)
         deleted_count = 0
         failed_deletes = []
-        reserved_names = ('tab.png', 'main.png', 'main@2x.png')
+        # Reserved files are often tab.png, main.png, main@2x.png (we only care about main and tab here)
+        reserved_names = ('tab.png', 'main.png', 'main@2x.png') 
         files_to_delete = [f for f in all_png_files if not f.lower() in reserved_names]
         
         for file_name in files_to_delete:
@@ -141,42 +153,52 @@ def process_bulk_resize_and_rename():
                      failed_deletes.append(file_name)
 
 
+        # 3. Save the processed and renamed images
         for img, new_file_name in processed_images:
             output_path = os.path.join(current_folder_path, new_file_name) 
+            # Save with optimization and high compression
             img.save(output_path, 'PNG', optimize=True, compress_level=9)
             
         if failed_deletes:
              messagebox.showwarning("Deletion Warning", 
-                                    f"ไม่สามารถลบไฟล์ต้นฉบับบางไฟล์ได้ ({len(failed_deletes)} ไฟล์):\n"
+                                    f"Could not delete some source files ({len(failed_deletes)} files):\n"
                                     f"{', '.join(failed_deletes)}\n\n"
-                                    f"โปรดตรวจสอบว่าไฟล์เหล่านี้ไม่ได้ถูกเปิดหรือถูกล็อกโดยโปรแกรมอื่น.")
+                                    f"Please check that these files are not open or locked by another program.")
         
         list_files(current_folder_path)
-        messagebox.showinfo("Success", f"สำเร็จ! ประมวลผลและตั้งชื่อ {processed_count} ไฟล์ (IN-PLACE)\nโหมด: {mode} ({current_target_size[0]}x{current_target_size[1]}px)\nไฟล์ต้นฉบับถูกเขียนทับและเรียงลำดับใหม่แล้ว")
-            
+        messagebox.showinfo("Success", 
+                            f"Success! Processed and renamed {processed_count} files (IN-PLACE)\n"
+                            f"Mode: {mode} ({current_target_size[0]}x{current_target_size[1]}px)\n"
+                            f"Source files have been overwritten and reordered.")
+             
     except Exception as e:
-        messagebox.showerror("Error", f"เกิดข้อผิดพลาดในการประมวลผล: {e}")
+        messagebox.showerror("Error", f"An error occurred during processing: {e}")
 
 def _create_single_image(target_size, new_file_name, dialog_title):
     global current_folder_path
     
+    # Ask user where to save the single output file
     output_dir = filedialog.askdirectory(title=dialog_title)
     if not output_dir:
         return
 
+    # Find all PNG files in the source folder
     all_png_files = [
         f for f in os.listdir(current_folder_path) 
         if f.lower().endswith(".png") and os.path.isfile(os.path.join(current_folder_path, f))
     ]
     
     if not all_png_files:
-        messagebox.showerror("Error", "ไม่พบไฟล์ .png ในโฟลเดอร์ที่เลือก")
+        messagebox.showerror("Error", "No .png files found in the selected folder")
         return
 
+    # Pick one file randomly for the Tab/Main image
     selected_file_name = random.choice(all_png_files)
     
     if messagebox.askyesno("Confirm Process", 
-                          f"ไฟล์ที่ถูกสุ่มเลือกคือ:\n{selected_file_name}\n\nต้องการดำเนินการลดขนาดเป็น {target_size[0]}x{target_size[1]}px และบันทึกเป็น {new_file_name} หรือไม่?") == False:
+                           f"The randomly selected file is:\n{selected_file_name}\n\n"
+                           f"Do you want to proceed with resizing to {target_size[0]}x{target_size[1]}px "
+                           f"and saving as {new_file_name}?") == False:
         return
         
     try:
@@ -186,65 +208,75 @@ def _create_single_image(target_size, new_file_name, dialog_title):
         with Image.open(source_path) as img:
             resized_img = img.resize(target_size, Image.Resampling.LANCZOS)
             
+            # Save with optimization and high compression
             resized_img.save(output_path, 'PNG', optimize=True, compress_level=9)
         
-        messagebox.showinfo("Success", f"สำเร็จ! ประมวลผลและคัดลอกไฟล์สุ่ม:\n{selected_file_name}\nเป็น\n{new_file_name}\nไปยัง:\n{output_dir}")
-            
+        messagebox.showinfo("Success", 
+                            f"Success! Processed and copied random file:\n{selected_file_name}\n"
+                            f"to\n{new_file_name}\nin:\n{output_dir}")
+             
     except Exception as e:
-        messagebox.showerror("Error", f"เกิดข้อผิดพลาดในการประมวลผล: {e}")
+        messagebox.showerror("Error", f"An error occurred during processing: {e}")
 
 def create_tab_image():
     global target_size_tab
-    _create_single_image(target_size_tab, "tab.png", "เลือกโฟลเดอร์สำหรับบันทึกภาพ Tab Image (tab.png)")
+    _create_single_image(target_size_tab, "tab.png", "Select folder to save Tab Image (tab.png)")
 
 def create_main_image():
     global main_size
-    _create_single_image(main_size, "main.png", "เลือกโฟลเดอร์สำหรับบันทึกภาพ Main Image (main.png)")
+    _create_single_image(main_size, "main.png", "Select folder to save Main Image (main.png)")
 
 
 def create_zip_archive():
     global current_folder_path
     
     if not current_folder_path or not os.path.isdir(current_folder_path):
-        messagebox.showerror("Error", "โปรดเลือกโฟลเดอร์ที่มีไฟล์ที่ประมวลผลแล้วก่อน")
+        messagebox.showerror("Error", "Please select a folder containing processed files first")
         return
 
+    # Get all PNG files for zipping
     all_png_files = sorted([
         f for f in os.listdir(current_folder_path) 
         if f.lower().endswith(".png") and os.path.isfile(os.path.join(current_folder_path, f))
     ])
     
     if not all_png_files:
-        messagebox.showerror("Error", "ไม่พบไฟล์ .png ในโฟลเดอร์ที่เลือกเพื่อสร้าง ZIP")
+        messagebox.showerror("Error", "No .png files found in the selected folder to create ZIP")
         return
 
     zip_path = filedialog.asksaveasfilename(
         initialdir=current_folder_path,
         defaultextension=".zip",
         filetypes=[("Zip files", "*.zip")],
-        title="บันทึกไฟล์ ZIP สำหรับส่ง LINE Creators Market"
+        title="Save ZIP file for LINE Creators Market submission"
     )
 
     if not zip_path:
         return
 
     try:
+        # Create ZIP file containing all relevant PNGs in the folder
         with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
             for file_name in all_png_files:
                 full_path = os.path.join(current_folder_path, file_name)
+                # Write file into the zip archive using only the filename as arcname
                 zf.write(full_path, arcname=file_name)
         
-        messagebox.showinfo("Success", f"สำเร็จ! สร้างไฟล์ ZIP ที่:\n{zip_path}\nมีทั้งหมด {len(all_png_files)} ไฟล์ พร้อมส่ง LINE Creators Market")
+        messagebox.showinfo("Success", 
+                            f"Success! Created ZIP file at:\n{zip_path}\n"
+                            f"Total {len(all_png_files)} files, ready for LINE Creators Market submission")
 
     except Exception as e:
-        messagebox.showerror("Error", f"เกิดข้อผิดพลาดในการสร้างไฟล์ ZIP: {e}")
+        messagebox.showerror("Error", f"An error occurred while creating ZIP file: {e}")
 
 
 def list_files(folder_path):
+    # Clear existing list
     for item in tree_view.get_children():
         tree_view.delete(item)
     
     try:
+        # Populate list with files from the folder
         for filename in os.listdir(folder_path):
             if os.path.isfile(os.path.join(folder_path, filename)):
                 tree_view.insert("", "end", values=(filename,))
@@ -252,6 +284,9 @@ def list_files(folder_path):
         pass
 
 
+# --- UI Setup ---
+
+# Calculate window position to center it
 width = 700
 height = 710 
 x = (win.winfo_screenwidth() // 2) - (width // 2)
@@ -261,38 +296,44 @@ win.title("LINE Creators Market Preparation Tool")
 current_dir_var = StringVar()
 
 
+# Mode Toggle Button (initial state set at the end)
 btnToggle = tk.Button(win, text="Mode Toggle", command=toggle_button) 
 btnToggle.pack(pady=10)
 
 
-btnOpenFile = Button(win, text="1. เลือกโฟลเดอร์ต้นทาง", width=30, pady=5, command=fileOpen)
+btnOpenFile = Button(win, text="1. Select Source Folder", width=30, pady=5, command=fileOpen)
 btnOpenFile.pack(pady=5)
 
-btnBulkProcess = tk.Button(win, text=f"2. ลดขนาดและเปลี่ยนชื่อไฟล์ทั้งหมด IN-PLACE", 
-                       width=55, pady=5, command=process_bulk_resize_and_rename, state=DISABLED, bg="#FF4500", fg="white")
+btnBulkProcess = tk.Button(win, text=f"2. Resize and Rename All Files IN-PLACE", 
+                         width=55, pady=5, command=process_bulk_resize_and_rename, 
+                         state=DISABLED, bg="#FF4500", fg="white")
 btnBulkProcess.pack(pady=5)
 
-btnTabImage = tk.Button(win, text=f"3. สุ่ม 1 ไฟล์ & สร้าง Tab Image (tab.png | {target_size_tab[0]}x{target_size_tab[1]}px)", 
-                       width=55, pady=5, command=create_tab_image, state=DISABLED, bg="#00CC99", fg="white")
+btnTabImage = tk.Button(win, text=f"3. Pick 1 Random File & Create Tab Image (tab.png | {target_size_tab[0]}x{target_size_tab[1]}px)", 
+                         width=55, pady=5, command=create_tab_image, 
+                         state=DISABLED, bg="#00CC99", fg="white")
 btnTabImage.pack(pady=5)
 
-btnMainImage = tk.Button(win, text=f"4. สุ่ม 1 ไฟล์ & สร้าง Main Image (main.png | {main_size[0]}x{main_size[1]}px)",
-                         width=55, pady=5, command=create_main_image, state=DISABLED, bg="#00CC99", fg="white")
+btnMainImage = tk.Button(win, text=f"4. Pick 1 Random File & Create Main Image (main.png | {main_size[0]}x{main_size[1]}px)",
+                         width=55, pady=5, command=create_main_image, 
+                         state=DISABLED, bg="#00CC99", fg="white")
 btnMainImage.pack(pady=5)
 
-btnZipArchive = tk.Button(win, text="5. สร้างไฟล์ Zip จากไฟล์ PNG ทั้งหมดในโฟลเดอร์",
-                         width=55, pady=5, command=create_zip_archive, state=DISABLED, bg="#3399FF", fg="white")
+btnZipArchive = tk.Button(win, text="5. Create ZIP Archive from All PNG Files in Folder",
+                         width=55, pady=5, command=create_zip_archive, 
+                         state=DISABLED, bg="#3399FF", fg="white")
 btnZipArchive.pack(pady=5)
 
 
 folder_label = tk.Label(win, textvariable=current_dir_var, fg="#0077b6")
 folder_label.pack(pady=5)
 
+# File List Treeview
 frame_file_list = Frame(win)
 frame_file_list.pack(padx=20, pady=10, fill="both", expand=True)
 
 tree_view = ttk.Treeview(frame_file_list, columns=("Files",), show="headings", selectmode="browse")
-tree_view.heading("Files", text="ไฟล์ในโฟลเดอร์ปัจจุบัน")
+tree_view.heading("Files", text="Files in Current Folder")
 tree_view.column("Files", width=300, anchor="w")
 tree_view.grid(row=0, column=0, sticky='nsew')
 
@@ -303,6 +344,7 @@ tree_view.configure(yscrollcommand=vsb.set)
 frame_file_list.grid_columnconfigure(0, weight=1)
 frame_file_list.grid_rowconfigure(0, weight=1)
 
+# Initialize the toggle button state and text
 toggle_button()
 
 win.mainloop()
