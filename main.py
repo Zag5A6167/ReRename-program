@@ -17,20 +17,20 @@ win.iconbitmap(default="R2N.ico")
 global file1
 file1 = None
 
-is_on = False  # Initial state (False for off)
-valBtnToggle = 3  # emoji , if 2 == sticker output file 
+is_on = False 
+valBtnToggle = 3  
 def toggle_button():
-    global is_on  # Access the global variable
+    global is_on  
     global valBtnToggle
-    is_on = not is_on  # Toggle the state
+    is_on = not is_on  
     if is_on:
-        btnToggle.config(text="Sticker")  # Update button text based on state
+        btnToggle.config(text="Sticker")  
         valBtnToggle = 2
     else:
-        btnToggle.config(text="Emoji")  # Update button text based on state
+        btnToggle.config(text="Emoji")  
         valBtnToggle = 3
 
-btnToggle = tk.Button(win, text="Emoji", command=toggle_button)  # Initial text "Off"
+btnToggle = tk.Button(win, text="Emoji", command=toggle_button)  
 btnToggle.pack()
 
 def fileOpen():
@@ -49,7 +49,7 @@ def rename_file(file1):
                 i = 1
                 for file in os.listdir(file1):
                     new_file_name = str(i).zfill(valBtnToggle) + ".png".format(i)
-                    # new_file_name = "{0:03d}.png".format(i)
+                  
 
                     os.rename(file,new_file_name)
                     i = i + 1  
